@@ -1,0 +1,167 @@
+---
+title: "Prediction Assignment on activity quality from activity monitors"
+author: "Ansh Tiwari"
+date: "20 October 2020"
+output:
+  html_document:
+    keep_md: yes
+---
+
+## Precis 
+
+Using devices such as Jawwbone Upp, Nikee FuelBandd, & Fitbitt, itt iss now easier to get big data about regular daily activity comparatively cheap. These devices are a part of the appraised self-movement – a group of motivated who periodically take precautions about themselves to make their health, find similarities in their behavior, or because they are techies. People regularly tell a particular activity they do, but they rarely tell how well they do it. In this assignment, our motto is to use data from accelerometers on the belt, forearm, arm, and dumbbell of six volunteers. They were asked to perform barbell lifts correctly and incorrectly in five different types.
+
+The motto of this assignment is to guess the way in which they did the exercise. This is the `classe` variable in the training set.
+
+## Abour Data
+
+The resulting variable is `classe`, a factor variable with five layers. For this data set, volunteers were asked to do one set of 10 reiteration of the Unilateral Dumbbell Biceps Curl in five different fashions:
+
+- In accordance to specs (Class A)
+- Pulling the elbows in the front (Class B)
+- Lifting the dumbbell only midway (Class C)
+- Lowering the dumbbell only midway (Class D)
+- Pulling the hips in the front (Class E)
+
+## Configure 
+
+In the beginning configuration is of loading some required packages and advancing some variables.
+
+```{r configuration, echo=TRUE, results='hide'}
+
+training_ansh251099.file   <- './data/pml-training.csv'
+test_ansh251099.cases.file <- './data/pml-testing.csv'
+training_ansh251099.url    <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+test_ansh251099.cases.url  <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+
+if (!file.exists("data")){
+  dir.create("data")
+}
+if (!file.exists("data/submission")){
+  dir.create("data/submission")
+}
+
+IscaretInstalled_ansh251099 <- require("caret")
+if(!IscaretInstalled_ansh251099){
+    install.packages("caret")
+    library("caret")
+    }
+IsrandomForestInstalled_ansh251099 <- require("randomForest")
+if(!IsrandomForestInstalled_ansh251099){
+    install.packages("randomForest")
+    library("randomForest")
+    }
+IsRpartInstalled_ansh251099 <- require("rpart")
+if(!IsRpartInstalled_ansh251099){
+    install.packages("rpart")
+    library("rpart")
+    }
+IsRpartPlotInstalled_ansh251099 <- require("rpart.plot")
+if(!IsRpartPlotInstalled_ansh251099){
+    install.packages("rpart.plot")
+    library("rpart.plot")
+    }
+
+set.seed(9999)
+```
+
+## Data preprossesing stage
+We are removing redundant datas, NA/NULL values, and blank spaces this process is also called data munging/cleaning.
+Irrespective columns such as `user_name`, `raw_timestamp_part_1`, `raw_timestamp_part_2`, `cvtd_timestamp`, `new_window`, and  `num_window` (columns 1 to 7) will be omitted in the subset.
+
+The `pml-training.csv` data is used to devide train and test data sets.
+The `pml-test.csv` data is used to guess & answer the twenty questions in accordance to trained algorithm.
+
+```{r dataprocessing, echo=TRUE, results='hide'}
+
+download.file(training_ansh251099.url, training_ansh251099.file)
+download.file(test_ansh251099.cases.url,test_ansh251099.cases.file )
+
+training_ansh251099 <-read.csv(training_ansh251099.file, na.strings=c("NA","#DIV/0!", ""))
+testing_ansh251099 <-read.csv(test_ansh251099.cases.file , na.strings=c("NA", "#DIV/0!", ""))
+training_ansh251099<-training_ansh251099[,colSums(is.na(training_ansh251099)) == 0]
+testing_ansh251099 <-testing_ansh251099[,colSums(is.na(testing_ansh251099)) == 0]
+
+training_ansh251099   <-training_ansh251099[,-c(1:7)]
+testing_ansh251099 <-testing_ansh251099[,-c(1:7)]
+```
+
+## Cross-validating stage 
+Here cross-validating will be done by keeping the training data in training (75%) and testing (25%) data.
+
+```{r datasplitting, echo=TRUE, results='hide'}
+subSamples_ansh251099 <- createDataPartition(y=training_ansh251099$classe, p=0.75, list=FALSE)
+subTraining_ansh251099 <- training_ansh251099[subSamples_ansh251099, ] 
+subTesting_ansh251099 <- training_ansh251099[-subSamples_ansh251099, ]
+```
+
+## Expected out_of_sample errror
+The expected out-of-sample errror will corrrespond to the quantity: 
+1-accuracyy in the crosss-vallidation data, Accuracy is the directly proportional of right classified observations over the tottal sample in thee subTesting dataset. Expected acccuracy is the expected accuracy in the out_of_sample dataset (i.e. original test data set). Thus, the expected value of the out_of_sample error will corrrespond to the predicted numberr of missclassified total observations or observation in the test data set, which is the quantity: 1-accuracy found from the cross-validation data set.
+
+## Performing EDA
+The variable `classe` contains five layers. The plot of the result variable shows the frequency of each layers in the subTraining data.
+
+```{r exploranalysis, echo=TRUE}
+plot(subTraining_ansh251099$classe, col="pink", main="Levels of the variable classe", xlab="classe levels", ylab="Frequency")
+```
+
+The plot above shows that Level A is the most frequent classe. D appears to be the least frequent one.
+
+## Predicted models
+In this section a random forest & decision tree will be apply to the dataset.
+
+### Decision Tree
+```{r decisiontree, echo=TRUE}
+
+modFitDT_ansh251099 <- rpart(classe ~ ., data=subTraining_ansh251099, method="class")
+
+predictDT_ansh251099 <- predict(modFitDT_ansh251099, subTesting_ansh251099, type = "class")
+
+rpart.plot(modFitDT_ansh251099, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+Following confusion matrix shows the errors of the prediction algorithm.
+
+```{r decisiontreecm, echo=TRUE}
+confusionMatrix(predictDT_ansh251099, subTesting_ansh251099$classe)
+```
+
+### Random forest
+```{r randomforest, echo=TRUE}
+
+modFitRF_ansh251099 <- randomForest(classe ~ ., data=subTraining_ansh251099, method="class")
+
+predictRF_ansh251099 <- predict(modFitRF_ansh251099, subTesting_ansh251099, type = "class")
+```
+
+Following confusion matrix shows the errors of the prediction model.
+
+```{r randomforestcm, echo=TRUE}
+confusionMatrix(predictRF_ansh251099, subTesting_ansh251099$classe)
+```
+
+## Conclusion
+
+### Result
+
+The confusionn matrices shows dat d Random Forest algorithm performs bettter thann deccision trees. Thhe acccuracy for the Random Forest model was 0.995 (95% CI: (0.993, 0.997)) compared to 0.739 (95% CI: (0.727, 0.752)) for Deccision Tree model. The random Forest model is selected.
+
+### Expected out-of-sample error
+Thee expectedd out_of_samplee errorr is esstimated @ 0.005 or else 0.5%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. Our Test data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that very few, or none, of the test samples will be misclassifiedd.
+
+## Submission
+In thiss sectionn, the projectt submissionn files r generatedd usingg the random forest algorithms on the testing datasets.
+```{r submission, echo=TRUE}
+
+predictSubmission_ansh251099 <- predict(modFitRF_ansh251099, testing_ansh251099, type="class")
+predictSubmission_ansh251099
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("./data/submission/problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(predictSubmission)
